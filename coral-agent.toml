@@ -1,0 +1,29 @@
+[agent]
+name = "security-compliance-monitor"
+version = "0.1.0"
+description = "Surfaces risky access changes, secrets in commits, CVEs (OSV), and policy violations (Notion). Alerts via Slack."
+
+[options]
+SYSTEM_PROMPT = { type = "string", required = false, default = "UNMODIFIED", description = "Override the built-in security monitor system prompt." }
+
+MODEL_API_KEY = { type = "string", required = true, description = "API key for the LLM provider." }
+MODEL_NAME = { type = "string", default = "gpt-4.1-mini", description = "Model name (see LangChain init_chat_model docs)." }
+MODEL_PROVIDER = { type = "string", default = "openai", description = "Model provider (openai, anthropic, etc.)." }
+MODEL_BASE_URL = { type = "string", required = false, default = "UNMODIFIED", description = "Optional custom base URL for the model API." }
+MODEL_TEMPERATURE = { type = "number", default = 0.1, description = "Model temperature." }
+MODEL_MAX_TOKENS = { type = "number", default = 4096, description = "Max output tokens per iteration." }
+MAX_ITERATIONS = { type = "number", default = 15, description = "Max LLM iterations per session." }
+
+GITHUB_TOKEN = { type = "string", required = false, description = "GitHub PAT with repo and read:org scopes." }
+GITHUB_OWNER = { type = "string", required = false, description = "Org or user to monitor." }
+GITHUB_REPO = { type = "string", required = false, description = "Repository name (without owner)." }
+GITHUB_COMMIT_LOOKBACK = { type = "number", default = 20, description = "Recent commits to scan for secrets and OSV." }
+
+SLACK_BOT_TOKEN = { type = "string", required = false, description = "Slack bot token (chat:write)." }
+SLACK_CHANNEL_ID = { type = "string", required = false, description = "Channel ID for security alerts." }
+
+NOTION_TOKEN = { type = "string", required = false, description = "Notion integration token for policy search." }
+NOTION_POLICY_QUERY = { type = "string", default = "security compliance policy", description = "Default search query for internal policy docs." }
+
+[runtimes.executable]
+command = ["uv", "run", "src/main.py"]

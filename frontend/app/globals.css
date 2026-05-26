@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+:root {
+  --bg-base: #070b12;
+  --bg-elevated: #0d1219;
+  --bg-panel: #111827;
+  --bg-hover: #1a2332;
+  --border-subtle: #1e293b;
+  --border-default: #334155;
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --accent: #3b82f6;
+  --critical: #ef4444;
+  --high: #f97316;
+  --medium: #eab308;
+  --low: #22c55e;
+  --healthy: #10b981;
+}
+
+@theme inline {
+  --color-background: var(--bg-base);
+  --color-foreground: var(--text-primary);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-coral-critical: var(--critical);
+  --color-coral-high: var(--high);
+  --color-coral-medium: var(--medium);
+  --color-coral-low: var(--low);
+  --color-coral-healthy: var(--healthy);
+  --color-coral-panel: var(--bg-panel);
+  --color-coral-elevated: var(--bg-elevated);
+  --color-coral-border: var(--border-subtle);
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+/* Scrollbar — minimal enterprise chrome */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-default) transparent;
+}
+
+::selection {
+  background: rgba(59, 130, 246, 0.35);
+}
