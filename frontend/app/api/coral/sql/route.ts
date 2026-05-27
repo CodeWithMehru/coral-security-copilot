@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isDemoMode } from "@/lib/env";
 import { ensureServerEnv } from "@/lib/env-server";
+import { enrichAgentSqlResult } from "@/lib/agent-sql-enrichment";
 import { runCoralQuery } from "@/lib/coral-service";
 import type { QueryKind } from "@/lib/query-kinds";
 
@@ -21,12 +22,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "SQL query is required." }, { status: 400 });
     }
 
-    const result = await runCoralQuery(sql, {
+    let result = await runCoralQuery(sql, {
       queryKind,
       allowDemoFallback: isDemoMode(),
     });
 
-    // Return 200 with structured error so Agent Chat can show SQL + friendly message
+    if (!isDemoMode()) {
+      result = await enrichAgentSqlResult(result, { queryKind, sql });
+    }
+
     return NextResponse.json(result);
   } catch (e) {
     const message = e instanceof Error ? e.message : "Invalid request";

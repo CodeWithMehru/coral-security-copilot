@@ -11,6 +11,7 @@ import { SqlResultTable } from "@/components/ui/SqlResultTable";
 import { ConfigureEmptyState } from "@/components/ui/ConfigureEmptyState";
 import { InfoBanner } from "@/components/ui/InfoBanner";
 import { parseSectionWarnings } from "@/lib/section-page-utils";
+import { EMPTY_SECRETS_MESSAGE } from "@/lib/errors";
 import type { ComplianceReport, CoralSqlResponse, Severity } from "@/lib/types";
 import { truncate } from "@/lib/utils";
 
@@ -42,6 +43,7 @@ export default function SecretScannerPage() {
   const [warnings, setWarnings] = useState<string[]>([]);
   const [informational, setInformational] = useState<string[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [emptyHint, setEmptyHint] = useState<string | null>(null);
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -49,7 +51,7 @@ export default function SecretScannerPage() {
     setError(null);
     try {
       const [secretsRes, configRes] = await Promise.all([
-        fetch("/api/secrets"),
+        fetch("/api/secrets?commits=1"),
         fetch("/api/config"),
       ]);
       const data = await secretsRes.json();
@@ -63,11 +65,13 @@ export default function SecretScannerPage() {
       setScan(data.scan ?? null);
       setWarnings(data.warnings ?? []);
       setInformational(data.informational ?? []);
+      setEmptyHint(data.emptyHint ?? null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load");
       setCoral(null);
       setScan(null);
       setInformational([]);
+      setEmptyHint(null);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -197,6 +201,11 @@ export default function SecretScannerPage() {
             ))}
             <ConfigureEmptyState
               variant={sectionMeta.needsConfig ? "configure" : "no-data"}
+              description={
+                sectionMeta.needsConfig
+                  ? undefined
+                  : emptyHint ?? EMPTY_SECRETS_MESSAGE
+              }
             />
           </div>
         ) : (

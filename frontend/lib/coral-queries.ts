@@ -20,7 +20,8 @@ function ghOptional(): { o: string; r: string; where: string } | null {
 
 /** Pre-built queries for section APIs and NL→SQL */
 export const CoralQueries = {
-  secretScanningAlerts: () => {
+  /** Lightweight query for dashboards / chat (fewer columns, lower limit) */
+  secretScanningAlertsLite: () => {
     const g = ghOptional();
     if (!g) throw new ConfigError("GITHUB_OWNER and GITHUB_REPO required.");
     const { where } = g;
@@ -32,16 +33,37 @@ export const CoralQueries = {
   created_at,
   html_url,
   first_location_detected__path AS file_path,
-  first_location_detected__start_line AS start_line,
-  resolution,
-  resolution_comment
+  first_location_detected__start_line AS start_line
 FROM github.repo_secret_scanning_alerts
 WHERE ${where}
 ORDER BY created_at DESC
-LIMIT 50`;
+LIMIT 25`;
   },
 
-  dependabotVulnerabilities: () => {
+  secretScanningAlerts: () => CoralQueries.secretScanningAlertsLite(),
+
+  /** GHAS secret scanning alerts — open state (for "show open alerts" intent) */
+  secretScanningAlertsOpen: () => {
+    const g = ghOptional();
+    if (!g) throw new ConfigError("GITHUB_OWNER and GITHUB_REPO required.");
+    const { where } = g;
+    return `SELECT
+  alert_number,
+  secret_type,
+  secret_type_display_name,
+  state,
+  created_at,
+  html_url,
+  first_location_detected__path AS file_path,
+  first_location_detected__start_line AS start_line
+FROM github.repo_secret_scanning_alerts
+WHERE ${where}
+  AND state = 'open'
+ORDER BY created_at DESC
+LIMIT 25`;
+  },
+
+  dependabotVulnerabilitiesLite: () => {
     const g = ghOptional();
     if (!g) throw new ConfigError("GITHUB_OWNER and GITHUB_REPO required.");
     const { where } = g;
@@ -50,22 +72,17 @@ LIMIT 50`;
   state,
   severity,
   created_at,
-  html_url,
   dependency__package__name AS package_name,
-  dependency__package__ecosystem AS ecosystem,
-  dependency__manifest_path AS manifest_path,
-  security_advisory__ghsa_id AS ghsa_id,
   security_advisory__cve_id AS cve_id,
-  security_advisory__summary AS advisory_summary,
-  security_advisory__severity AS advisory_severity,
-  security_vulnerability__severity AS vuln_severity
+  security_advisory__ghsa_id AS ghsa_id,
+  security_advisory__summary AS advisory_summary
 FROM github.repo_dependabot_alerts
 WHERE ${where}
-ORDER BY
-  CASE severity WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END,
-  created_at DESC
-LIMIT 50`;
+ORDER BY created_at DESC
+LIMIT 25`;
   },
+
+  dependabotVulnerabilities: () => CoralQueries.dependabotVulnerabilitiesLite(),
 
   collaboratorsAccess: () => {
     const g = ghOptional();
@@ -100,8 +117,97 @@ ORDER BY commit__author__date DESC
 LIMIT 30`;
   },
 
-  notionPolicySearch: (query?: string) => {
-    const q = sqlLiteral(query ?? process.env.NOTION_POLICY_QUERY ?? "security compliance policy");
+  /**
+   * Secret discovery via commit messages (works without GHAS).
+   * Agent Guideline 1 — prefer over repo_secret_scanning_alerts alone.
+   */
+  commitsSecretPatterns: () => {
+    const g = ghOptional();
+    if (!g) throw new ConfigError("GITHUB_OWNER and GITHUB_REPO required.");
+    const { where } = g;
+    return `SELECT
+  sha AS commit_hash,
+  commit__message AS message,
+  commit__author__name AS author_name,
+  commit__author__date AS authored_at,
+  html_url
+FROM github.commits
+WHERE ${where}
+  AND (
+    LOWER(commit__message) LIKE '%token%'
+    OR LOWER(commit__message) LIKE '%secret%'
+    OR LOWER(commit__message) LIKE '%key%'
+    OR LOWER(commit__message) LIKE '%password%'
+    OR LOWER(commit__message) LIKE '%apikey%'
+    OR LOWER(commit__message) LIKE '%credential%'
+    OR LOWER(commit__message) LIKE '%aws%'
+    OR LOWER(commit__message) LIKE '%pat_%'
+    OR LOWER(commit__message) LIKE '%ghp_%'
+  )
+ORDER BY commit__author__date DESC
+LIMIT 10`;
+  },
+
+  /** Guideline 1 — commits + Slack security channels in one result */
+  secretsCommitsWithSlack: () => {
+    const g = ghOptional();
+    if (!g) throw new ConfigError("GITHUB_OWNER and GITHUB_REPO required.");
+    const { o, r } = g;
+    return `SELECT
+  c.sha AS commit_hash,
+  c.commit__message AS message,
+  c.commit__author__date AS authored_at,
+  sl.name AS slack_channel,
+  sl.topic AS slack_topic
+FROM github.commits AS c
+LEFT JOIN slack.channels AS sl ON LOWER(sl.name) LIKE '%security%'
+WHERE c.owner = ${o} AND c.repo = ${r}
+  AND (
+    LOWER(c.commit__message) LIKE '%token%'
+    OR LOWER(c.commit__message) LIKE '%secret%'
+    OR LOWER(c.commit__message) LIKE '%key%'
+    OR LOWER(c.commit__message) LIKE '%password%'
+    OR LOWER(c.commit__message) LIKE '%credential%'
+  )
+ORDER BY c.commit__author__date DESC
+LIMIT 25`;
+  },
+
+  /** RULE 1 — open Dependabot alerts (include NULL severity — e.g. postcss CVE) */
+  dependabotCriticalHigh: () => {
+    const g = ghOptional();
+    if (!g) throw new ConfigError("GITHUB_OWNER and GITHUB_REPO required.");
+    const { where } = g;
+    return `SELECT
+  alert_number,
+  state,
+  severity,
+  created_at,
+  dependency__package__name AS package_name,
+  security_advisory__cve_id AS cve_id,
+  security_advisory__ghsa_id AS ghsa_id,
+  security_advisory__summary AS advisory_summary
+FROM github.repo_dependabot_alerts
+WHERE ${where}
+  AND (state = 'open' OR state IS NULL)
+ORDER BY created_at DESC
+LIMIT 25`;
+  },
+
+  /** Guideline 3 — connectivity probe for Notion */
+  notionConnectivityProbe: () => `SELECT
+  id,
+  url,
+  query,
+  object,
+  last_edited_time
+FROM notion.search
+LIMIT 10`,
+
+  notionPolicySearchBroad: () => {
+    const q = sqlLiteral(
+      process.env.NOTION_POLICY_QUERY ?? "security compliance policy"
+    );
     return `SELECT
   id,
   url,
@@ -113,6 +219,8 @@ FROM notion.search
 WHERE query = ${q}
 LIMIT 25`;
   },
+
+  notionPolicySearch: (_query?: string) => CoralQueries.notionPolicySearchBroad(),
 
   slackSecurityChannels: () => `SELECT
   id,
@@ -157,11 +265,12 @@ ORDER BY s.created_at DESC
 LIMIT 30`;
   },
 
+  /** RULE 4 — collaborators + notion.search (query parameter assignment) */
   accessWithPolicies: () => {
     const g = ghOptional();
     if (!g) throw new ConfigError("GITHUB_OWNER and GITHUB_REPO required.");
-    const { where } = g;
-    const policyQ = sqlLiteral(
+    const { o, r } = g;
+    const notionQ = sqlLiteral(
       process.env.NOTION_POLICY_QUERY ?? "security compliance policy"
     );
     return `SELECT
@@ -173,10 +282,32 @@ LIMIT 30`;
   n.query AS policy_query,
   n.last_edited_time AS policy_updated
 FROM github.collaborators AS c
-CROSS JOIN notion.search AS n
-WHERE c.${where} AND n.query = ${policyQ}
+LEFT JOIN notion.search AS n ON n.query = ${notionQ}
+WHERE c.owner = ${o} AND c.repo = ${r}
 ORDER BY c.permission DESC
 LIMIT 40`;
+  },
+
+  /** RULE 3 — unified risk posture (LEFT JOIN — no row loss when Slack/Notion empty) */
+  enterpriseRiskPostureJoin: () => {
+    const g = ghOptional();
+    if (!g) throw new ConfigError("GITHUB_OWNER and GITHUB_REPO required.");
+    const { o, r } = g;
+    const notionQ = sqlLiteral(
+      process.env.NOTION_POLICY_QUERY ?? "security compliance policy"
+    );
+    return `SELECT
+  gh.dependency__package__name AS package_name,
+  gh.security_advisory__cve_id AS cve_id,
+  gh.state,
+  sl.name AS slack_channel,
+  no.url AS notion_policy
+FROM github.repo_dependabot_alerts AS gh
+LEFT JOIN slack.channels AS sl ON LOWER(sl.name) LIKE '%security%'
+LEFT JOIN notion.search AS no ON no.query = ${notionQ}
+WHERE gh.owner = ${o} AND gh.repo = ${r}
+  AND (gh.state = 'open' OR gh.state IS NULL)
+LIMIT 25`;
   },
 
   unifiedSecurityPosture: () => {
@@ -211,13 +342,13 @@ export function buildQueryForKind(kind: QueryKind): string {
   switch (kind) {
     case "secrets_recent":
     case "secrets_with_commits":
-      return CoralQueries.secretScanningAlerts();
+      return CoralQueries.commitsSecretPatterns();
     case "access_risky":
       return CoralQueries.collaboratorsAccess();
     case "access_with_policies":
       return CoralQueries.accessWithPolicies();
     case "vulns_dependencies":
-      return CoralQueries.dependabotVulnerabilities();
+      return CoralQueries.dependabotCriticalHigh();
     case "compliance_gaps":
       return CoralQueries.accessWithPolicies();
     case "slack_incidents":
@@ -225,7 +356,7 @@ export function buildQueryForKind(kind: QueryKind): string {
     case "posture_summary":
     case "unified_events":
     default:
-      return CoralQueries.unifiedSecurityPosture();
+      return CoralQueries.enterpriseRiskPostureJoin();
   }
 }
 
@@ -233,7 +364,7 @@ export function buildQueryForKindSafe(kind: QueryKind): string {
   if (!getGitHubScope()) {
     if (kind === "slack_incidents") return CoralQueries.slackSecurityChannels();
     if (kind === "compliance_gaps" || kind === "access_with_policies") {
-      return CoralQueries.notionPolicySearch();
+      return CoralQueries.notionPolicySearchBroad();
     }
   }
   return buildQueryForKind(kind);
@@ -248,24 +379,26 @@ export function buildCrossSourceJoinQuery(intent: "secrets" | "access" | "vulns"
   switch (intent) {
     case "secrets":
       return canRunGitHubQueries()
-        ? CoralQueries.secretsWithDependencies()
+        ? CoralQueries.secretsCommitsWithSlack()
         : CoralQueries.slackSecurityChannels();
     case "access":
       return canRunGitHubQueries()
         ? CoralQueries.accessWithPolicies()
-        : CoralQueries.notionPolicySearch();
+        : CoralQueries.notionPolicySearchBroad();
     case "vulns":
       return canRunGitHubQueries()
-        ? CoralQueries.dependabotVulnerabilities()
+        ? CoralQueries.dependabotCriticalHigh()
         : `SELECT 'configuration' AS source, 'Set GITHUB_OWNER and GITHUB_REPO' AS message`;
     case "compliance":
       return canRunGitHubQueries()
         ? CoralQueries.accessWithPolicies()
-        : CoralQueries.notionPolicySearch();
+        : CoralQueries.notionPolicySearchBroad();
     case "slack":
       return CoralQueries.slackSecurityChannels();
     case "posture":
     default:
-      return CoralQueries.unifiedSecurityPosture();
+      return canRunGitHubQueries()
+        ? CoralQueries.enterpriseRiskPostureJoin()
+        : CoralQueries.slackSecurityChannels();
   }
 }

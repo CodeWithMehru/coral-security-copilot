@@ -6,7 +6,11 @@ import type { ChatMessage, ChatGenerateResponse, CoralSqlResponse } from "@/lib/
 import { LoadingState } from "@/components/ui/LoadingState";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { InfoBanner } from "@/components/ui/InfoBanner";
-import { isRateLimitMessage } from "@/lib/errors";
+import {
+  CHAT_QUERY_FAILED_MESSAGE,
+  isRateLimitMessage,
+  RATE_LIMIT_USER_MESSAGE,
+} from "@/lib/errors";
 import { SqlResultTable } from "@/components/ui/SqlResultTable";
 import { SUGGESTED_PROMPTS } from "@/lib/suggested-prompts";
 import { cn } from "@/lib/utils";
@@ -172,7 +176,8 @@ export function ChatInterface() {
           setError(execError);
         }
       } else if (isLiveCoral && !hasRows && !execError) {
-        notice = "No rows matched this query. Your repository may have no matching security records.";
+        notice =
+          "No rows matched this query. For secrets, push a test credential to the repo or check that secret scanning is enabled.";
         setError(null);
       } else {
         setError(null);
@@ -200,8 +205,9 @@ export function ChatInterface() {
       );
       setTimeout(scrollToBottom, 100);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Request failed";
-      const rateLimited = isRateLimitMessage(msg);
+      const raw = e instanceof Error ? e.message : "Request failed";
+      const rateLimited = isRateLimitMessage(raw);
+      const msg = rateLimited ? RATE_LIMIT_USER_MESSAGE : raw || CHAT_QUERY_FAILED_MESSAGE;
       if (!rateLimited) setError(msg);
       setMessages((m) => {
         const hasAssistant = m.some((x) => x.id === assistantId);

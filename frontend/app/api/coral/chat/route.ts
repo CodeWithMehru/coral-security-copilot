@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { ensureServerEnv } from "@/lib/env-server";
+import { AGENT_SYSTEM_PROMPT, NOTION_SEARCH_QUERY } from "@/lib/agent-system-prompt";
 import { naturalLanguageToSql } from "@/lib/nl-to-sql";
 
 export const runtime = "nodejs";
 
-/** POST /api/coral/chat — NL → Coral SQL (client executes via /api/coral/sql) */
+/** POST /api/coral/chat — NL → Coral SQL (Unified Security Context Engine) */
 export async function POST(request: Request) {
   ensureServerEnv();
   try {
@@ -19,7 +20,11 @@ export async function POST(request: Request) {
       sql: generated.sql,
       explanation: generated.explanation,
       queryKind: generated.queryKind,
+      routedIntent: generated.routedIntent,
       fromTemplate: generated.fromTemplate,
+      systemPrompt: generated.systemPrompt,
+      agentRole: AGENT_SYSTEM_PROMPT,
+      notionSearchQuery: NOTION_SEARCH_QUERY,
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Failed to generate SQL";

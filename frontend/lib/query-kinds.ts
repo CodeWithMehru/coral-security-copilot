@@ -12,9 +12,14 @@ export type QueryKind =
 
 export function inferQueryKindFromSql(sql: string): QueryKind {
   const lower = sql.toLowerCase();
+  if (lower.includes("github.commits") && lower.includes("slack"))
+    return "secrets_with_commits";
   if (lower.includes("security_secret_findings") && lower.includes("join"))
     return "secrets_with_commits";
-  if (lower.includes("secret")) return "secrets_recent";
+  if (lower.includes("github.commits") || lower.includes("commit_hash"))
+    return "secrets_with_commits";
+  if (lower.includes("secret") || lower.includes("compliance_commit_scan"))
+    return "secrets_recent";
   if (lower.includes("security_access_events") && lower.includes("policy"))
     return "access_with_policies";
   if (lower.includes("access") || lower.includes("permission"))

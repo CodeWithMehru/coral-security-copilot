@@ -19,6 +19,7 @@ export interface CoralQueryResult extends CoralSqlResponse {
   mode: "demo" | "live";
   notice?: string;
   errorKind?: string;
+  errorSource?: string;
 }
 
 /** Execute SQL via Coral CLI; demo mode only uses virtual projection */
@@ -58,7 +59,7 @@ export async function runCoralQuery(
 
   if (result.error) {
     const formatted = formatIntegrationError(result.error);
-    if (formatted.kind === "rate_limit") {
+    if (formatted.kind === "rate_limit" && formatted.source === "github") {
       markGitHubRateLimited();
     }
     const shaped: CoralQueryResult = {
@@ -67,8 +68,12 @@ export async function runCoralQuery(
       mode: "live",
       error: formatted.message,
       errorKind: formatted.kind,
+      errorSource: formatted.source,
       notice:
-        formatted.kind === "rate_limit" || formatted.kind === "auth"
+        formatted.kind === "rate_limit" ||
+        formatted.kind === "auth" ||
+        formatted.source === "slack" ||
+        formatted.source === "notion"
           ? formatted.message
           : formatted.detail
             ? `Technical detail: ${formatted.detail}`
@@ -100,13 +105,15 @@ export async function checkCoralSources(): Promise<{
   sources: string[];
   error?: string;
   errorKind?: string;
+  errorSource?: string;
 }> {
   if (isGitHubRateLimited()) {
     return {
       ok: false,
       sources: [],
-      error: "GitHub rate limit reached. Please wait 30 minutes.",
+      error: "GitHub API rate limit reached. Please wait 30 minutes before retrying.",
       errorKind: "rate_limit",
+      errorSource: "github",
     };
   }
 
@@ -115,12 +122,15 @@ export async function checkCoralSources(): Promise<{
   );
   if (result.error) {
     const formatted = formatIntegrationError(result.error);
-    if (formatted.kind === "rate_limit") markGitHubRateLimited();
+    if (formatted.kind === "rate_limit" && formatted.source === "github") {
+      markGitHubRateLimited();
+    }
     return {
       ok: false,
       sources: [],
       error: formatted.message,
       errorKind: formatted.kind,
+      errorSource: formatted.source,
     };
   }
   const sources = result.rows

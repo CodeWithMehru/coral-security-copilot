@@ -1,7 +1,8 @@
+import { GITHUB_RATE_LIMIT_MESSAGE } from "./errors";
 import type { CoralQueryResult } from "./coral-service";
 
-/** Successful Coral query cache TTL */
-const CACHE_TTL_MS = 90_000;
+/** Successful Coral query cache TTL (shared by dashboard + scanners) */
+const CACHE_TTL_MS = 120_000;
 
 /** After GitHub 429/rate-limit, pause new Coral CLI calls */
 const RATE_LIMIT_COOLDOWN_MS = 30 * 60 * 1000;
@@ -53,7 +54,8 @@ export function rateLimitBlockedResult(sql: string): CoralQueryResult {
     durationMs: 0,
     dataSource: "coral",
     mode: "live",
-    error: "GitHub rate limit reached. Please wait 30 minutes.",
+    error: GITHUB_RATE_LIMIT_MESSAGE,
     errorKind: "rate_limit",
+    errorSource: "github",
   };
 }

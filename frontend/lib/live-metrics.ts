@@ -1,6 +1,11 @@
 import { CoralQueries } from "./coral-queries";
 import { runCoralQuery } from "./coral-service";
 import { isGitHubRateLimited } from "./coral-cache";
+import {
+  getCachedDashboard,
+  setCachedDashboard,
+  type DashboardCachePayload,
+} from "./dashboard-cache";
 import { formatWarnings, isRateLimitMessage } from "./errors";
 import { isDemoMode } from "./env";
 import { buildDashboardMetrics, DEMO_ACTIVITY, DEMO_REPORT } from "./demo-data";
@@ -17,8 +22,8 @@ function isRateLimitResult(error?: string, errorKind?: string): boolean {
 }
 
 /**
- * Dashboard uses at most two GitHub Coral queries (secrets + vulns).
- * Skips Slack, Notion, compliance scan, and access queries to reduce API pressure.
+ * Dashboard: one lite secrets query (shared cache with Secret Scanner).
+ * Dependabot query only when not rate-limited.
  */
 export async function buildLiveDashboardMetrics(): Promise<{
   metrics: DashboardMetrics;
@@ -34,7 +39,8 @@ export async function buildLiveDashboardMetrics(): Promise<{
   let patternMatches = 0;
   const activity: ActivityItem[] = [];
 
-  const secrets = await runCoralQuery(CoralQueries.secretScanningAlerts(), {
+  const secretsSql = CoralQueries.commitsSecretPatterns();
+  const secrets = await runCoralQuery(secretsSql, {
     queryKind: "secrets_recent",
     allowDemoFallback: false,
   });
@@ -65,7 +71,7 @@ export async function buildLiveDashboardMetrics(): Promise<{
   }
 
   if (!isGitHubRateLimited() && !isRateLimitResult(secrets.error, secrets.errorKind)) {
-    const vulns = await runCoralQuery(CoralQueries.dependabotVulnerabilities(), {
+    const vulns = await runCoralQuery(CoralQueries.dependabotCriticalHigh(), {
       queryKind: "vulns_dependencies",
       allowDemoFallback: false,
     });
@@ -140,12 +146,7 @@ export async function buildLiveDashboardMetrics(): Promise<{
   };
 }
 
-export async function getDashboardPayload(): Promise<{
-  metrics: DashboardMetrics;
-  mode: "demo" | "live";
-  warnings: string[];
-  informational?: string[];
-}> {
+export async function getDashboardPayload(): Promise<DashboardCachePayload> {
   if (isDemoMode()) {
     return {
       metrics: buildDashboardMetrics(DEMO_REPORT, DEMO_ACTIVITY),
@@ -154,11 +155,16 @@ export async function getDashboardPayload(): Promise<{
     };
   }
 
+  const cached = getCachedDashboard();
+  if (cached) return cached;
+
   const { metrics, warnings, informational } = await buildLiveDashboardMetrics();
-  return {
+  const payload: DashboardCachePayload = {
     metrics,
     mode: "live",
     warnings,
     informational: informational.length ? informational : undefined,
   };
+  setCachedDashboard(payload);
+  return payload;
 }
