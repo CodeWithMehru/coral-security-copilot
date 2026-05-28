@@ -1,12 +1,12 @@
-# 1. Ek solid Linux machine uthao (Updated to bookworm for Node 20)
+# 1. Ek solid Linux machine uthao (Debian Bookworm for Node 20)
 FROM debian:bookworm-slim
 
-# 2. Saare zaroori tools, Python aur Node.js (Node 20) install karo
+# 2. Saare zaroori tools, Python aur Node.js install karo
 RUN apt-get update && apt-get install -y curl python3 python3-pip python3-venv \
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs
 
-# 3. System-wide uv install karo (koi PATH ka rona nahi)
+# 3. System-wide uv install karo
 RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="/usr/local/bin" sh
 
 # 4. Project ka saara code machine mein daalo
@@ -21,9 +21,12 @@ WORKDIR /app/frontend
 RUN npm install
 RUN npm run build
 
-# 7. Render ko batao kis port pe chalna hai
+# 7. THE FIX: Yahan hum Next.js ko Python (venv) aur uv ka exact rasta de rahe hain
+ENV PATH="/app/.venv/bin:/usr/local/bin:${PATH}"
+
+# 8. Render ko batao kis port pe chalna hai
 ENV PORT=10000
 EXPOSE 10000
 
-# 8. Start command (Render directly ise run karega)
+# 9. Start command
 CMD ["npm", "start"]
