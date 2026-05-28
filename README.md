@@ -130,5 +130,10 @@ Pattern-based scanner (redacted previews only): GitHub PATs, Slack tokens, Notio
 ---
 
 ## Author
-
 **Mehraan Amin** GitHub: [@CodeWithMehru](https://github.com/CodeWithMehru)
+
+## 🌐 Live Demo (Sandbox Environment)
+**Live Link:** [https://coral-security-copilot.vercel.app/](https://coral-security-copilot.vercel.app/)
+
+> **Security Note:** As a cybersecurity best practice, the live Vercel deployment runs in a **Sandbox / Demo Mode** to prevent the exposure of active Personal Access Tokens (PATs) on a public domain. It allows you to freely explore the UI, UX, and AI Agent interactions. 
+> To test the *Real-Time Scanning Engine*, please clone the repository, insert your own `.env` credentials, and run it locally.
