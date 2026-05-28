@@ -54,6 +54,7 @@ export async function loadScanReportOptional(): Promise<ScanLoadResult> {
     const child = spawn(uvPath, ["run", "python", "src/cli.py", "--no-slack"], {
       cwd: root,
       env: process.env,
+      shell: true, // THE MAGIC FIX: Ye Linux ko batata hai ki path dhoondhne ke liye terminal use kar
     });
 
     let stdout = "";
