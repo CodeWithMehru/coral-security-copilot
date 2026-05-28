@@ -7,7 +7,6 @@ import type { ComplianceReport } from "./types";
 
 export class ScanError extends Error {
   readonly formatted: ReturnType<typeof formatIntegrationError>;
-
   constructor(message: string, raw?: string) {
     const formatted = formatIntegrationError(raw ?? message);
     super(formatted.message);
@@ -16,107 +15,44 @@ export class ScanError extends Error {
   }
 }
 
-export type ScanLoadResult = {
-  report: ComplianceReport | null;
-  source: "demo" | "cli" | "skipped";
-  message?: string;
-};
+export type ScanLoadResult = { report: ComplianceReport | null; source: "demo" | "cli" | "skipped"; message?: string; };
 
-function emptyReport(): ComplianceReport {
-  return {
-    access_findings: [],
-    secret_findings: [],
-    osv_findings: [],
-    policy_matches: [],
-    errors: [],
-    summary: {
-      access_count: 0,
-      secret_count: 0,
-      osv_count: 0,
-      policy_count: 0,
-      error_count: 0,
-    },
-  };
-}
-
-/**
- * Optional compliance scan — never throws for missing uv; returns skipped with message.
- */
 export async function loadScanReportOptional(): Promise<ScanLoadResult> {
-  if (isDemoMode()) {
-    return { report: DEMO_REPORT, source: "demo" };
-  }
+  if (isDemoMode()) return { report: DEMO_REPORT, source: "demo" };
 
-  const root = process.env.CORALSEC_ROOT ?? path.resolve(process.cwd(), "..");
-  
-  // CRITICAL FIX: Force absolute path for Docker so it finds uv properly
-  const uvPath = process.env.NODE_ENV === "production" ? "/usr/bin/uv" : (process.env.UV_BIN ?? "uv");
+  // THE MASTER FIX: Use the absolute Python path embedded in Docker, bypassing uv entirely
+  const isProd = process.env.NODE_ENV === "production";
+  const cmd = isProd ? "/app/.venv/bin/python" : "uv";
+  const args = isProd ? ["src/cli.py", "--no-slack"] : ["run", "python", "src/cli.py", "--no-slack"];
+  const cwd = isProd ? "/app" : path.resolve(process.cwd(), "..");
 
   return new Promise((resolve) => {
-    // CRITICAL FIX: Removed shell: true so Linux doesn't break the command
-    const child = spawn(uvPath, ["run", "python", "src/cli.py", "--no-slack"], {
-      cwd: root,
-      env: process.env,
-    });
+    const child = spawn(cmd, args, { cwd, env: process.env });
 
     let stdout = "";
     let stderr = "";
 
     child.on("error", (err) => {
-      const formatted = formatIntegrationError(err.message);
-      resolve({
-        report: null,
-        source: "skipped",
-        message: formatted.message,
-      });
+      resolve({ report: null, source: "skipped", message: err.message });
     });
 
-    child.stdout.on("data", (c: Buffer) => {
-      stdout += c.toString();
-    });
-    child.stderr.on("data", (c: Buffer) => {
-      stderr += c.toString();
-    });
+    child.stdout.on("data", (c: Buffer) => { stdout += c.toString(); });
+    child.stderr.on("data", (c: Buffer) => { stderr += c.toString(); });
 
     child.on("close", (code) => {
       if (code === 0 && stdout.trim()) {
-        try {
-          resolve({ report: JSON.parse(stdout), source: "cli" });
-          return;
-        } catch {
-          resolve({
-            report: null,
-            source: "skipped",
-            message: "Compliance scanner returned invalid JSON.",
-          });
-          return;
-        }
+        try { resolve({ report: JSON.parse(stdout), source: "cli" }); return; } 
+        catch { resolve({ report: null, source: "skipped", message: "Invalid JSON" }); return; }
       }
-
-      const raw = stderr.trim() || stdout.trim() || `exit code ${code}`;
-      const formatted = formatIntegrationError(raw);
-      resolve({
-        report: null,
-        source: "skipped",
-        message: formatted.message,
-      });
+      resolve({ report: null, source: "skipped", message: stderr || stdout });
     });
   });
 }
 
-/** @deprecated use loadScanReportOptional */
-export async function loadScanReport(): Promise<{
-  report: ComplianceReport;
-  source: "demo" | "cli";
-}> {
+export async function loadScanReport(): Promise<{ report: ComplianceReport; source: "demo" | "cli"; }> {
   const result = await loadScanReportOptional();
-  if (result.source === "demo" && result.report) {
-    return { report: result.report, source: "demo" };
-  }
-  if (result.report) {
-    return { report: result.report, source: "cli" };
-  }
+  if (result.source === "demo" && result.report) return { report: result.report, source: "demo" };
+  if (result.report) return { report: result.report, source: "cli" };
   throw new ScanError(result.message ?? "Scan unavailable");
 }
-
-export { emptyReport };
+export function emptyReport(): ComplianceReport { return { access_findings: [], secret_findings: [], osv_findings: [], policy_matches: [], errors: [], summary: { access_count: 0, secret_count: 0, osv_count: 0, policy_count: 0, error_count: 0 } }; }
