@@ -31,5 +31,7 @@ ENV CORAL_WORKDIR="/app"
 ENV PORT=10000
 EXPOSE 10000
 
-# 9. Start the app
-CMD ["npm", "start"]
+# 9. Start Next.js directly (Fixes SIGTERM crash on Render)
+ENV NODE_ENV=production
+# Next.js standalone build puts server.js inside the .next/standalone folder
+CMD ["node", ".next/standalone/server.js"]

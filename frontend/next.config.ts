@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  output: "standalone", // Ye Render aur Docker ke liye magic switch hai
 };
 
 export default nextConfig;

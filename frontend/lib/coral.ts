@@ -104,6 +104,7 @@ export function executeCoralSql(sql: string): Promise<CoralSqlResponse> {
     const child = spawn(coralBin, ["sql", sql, "--format", "json"], {
       env: childEnv,
       cwd,
+      shell: true, // THE MAGIC FIX for dashboard data
     });
 
     let stdout = "";
