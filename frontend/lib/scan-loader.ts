@@ -48,13 +48,15 @@ export async function loadScanReportOptional(): Promise<ScanLoadResult> {
   }
 
   const root = process.env.CORALSEC_ROOT ?? path.resolve(process.cwd(), "..");
-  const uvPath = process.env.UV_BIN ?? "uv";
+  
+  // CRITICAL FIX: Force absolute path for Docker so it finds uv properly
+  const uvPath = process.env.NODE_ENV === "production" ? "/usr/bin/uv" : (process.env.UV_BIN ?? "uv");
 
   return new Promise((resolve) => {
+    // CRITICAL FIX: Removed shell: true so Linux doesn't break the command
     const child = spawn(uvPath, ["run", "python", "src/cli.py", "--no-slack"], {
       cwd: root,
       env: process.env,
-      shell: true, // THE MAGIC FIX: Ye Linux ko batata hai ki path dhoondhne ke liye terminal use kar
     });
 
     let stdout = "";
