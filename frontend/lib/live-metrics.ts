@@ -59,8 +59,11 @@ export async function buildLiveDashboardMetrics(): Promise<{
       const sev: ActivityItem["severity"] = state === "open" ? "critical" : "high";
       if (sev === "critical") criticalCount++;
       else highCount++;
+      const commitHash = rowStr(row, "commit_hash") || rowStr(row, "sha");
+      const alertNumber = rowStr(row, "alert_number");
       activity.push({
-        id: `gh-secret-${rowStr(row, "alert_number")}`,
+        // commit-based secret scans don't have alert_number; ensure stable unique IDs
+        id: `gh-secret-${commitHash || alertNumber || rowStr(row, "html_url") || `row-${crypto.randomUUID()}`}`,
         timestamp: rowStr(row, "created_at") || new Date().toISOString(),
         source: "github",
         title: `Secret scanning: ${rowStr(row, "secret_type")}`,

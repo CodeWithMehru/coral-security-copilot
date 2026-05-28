@@ -168,11 +168,15 @@ export default function DashboardPage() {
                 </div>
               ) : (
               <ul className="divide-y divide-coral-border">
-                {metrics.recentActivity.map((item) => {
+                {metrics.recentActivity.map((item, idx) => {
                   const Icon = sourceIcon(item.source);
+                  const stableKey =
+                    item.id && item.id.trim().length > 0
+                      ? item.id
+                      : `${item.source}-${item.timestamp}-${idx}`;
                   return (
                     <li
-                      key={item.id}
+                      key={stableKey}
                       className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-slate-800/30"
                     >
                       <Icon
