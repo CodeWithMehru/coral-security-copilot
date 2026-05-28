@@ -1,9 +1,9 @@
-# 1. Ek solid Linux machine uthao
-FROM debian:bullseye-slim
+# 1. Ek solid Linux machine uthao (Updated to bookworm for Node 20)
+FROM debian:bookworm-slim
 
-# 2. Saare zaroori tools, Python aur Node.js install karo
+# 2. Saare zaroori tools, Python aur Node.js (Node 20) install karo
 RUN apt-get update && apt-get install -y curl python3 python3-pip python3-venv \
-    && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs
 
 # 3. System-wide uv install karo (koi PATH ka rona nahi)
