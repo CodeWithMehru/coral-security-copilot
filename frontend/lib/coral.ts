@@ -90,7 +90,12 @@ export function executeCoralSql(sql: string): Promise<CoralSqlResponse> {
   }
 
   const start = Date.now();
-  const coralBin = process.env.CORAL_BIN ?? "coral";
+  
+  // CRITICAL FIX 1: Force absolute path in production so Render variables don't break it
+  const coralBin = process.env.NODE_ENV === "production" 
+    ? "/app/.venv/bin/coral" 
+    : (process.env.CORAL_BIN ?? "coral");
+    
   const cwd = process.env.CORAL_WORKDIR ?? process.env.CORALSEC_ROOT ?? process.cwd();
 
   const childEnv = {
@@ -101,10 +106,11 @@ export function executeCoralSql(sql: string): Promise<CoralSqlResponse> {
   };
 
   return new Promise((resolve) => {
+    // CRITICAL FIX 2: NO "shell: true" HERE! 
+    // This stops Linux from breaking multi-line SQL into fake commands.
     const child = spawn(coralBin, ["sql", sql, "--format", "json"], {
       env: childEnv,
       cwd,
-      shell: true, // THE MAGIC FIX for dashboard data
     });
 
     let stdout = "";
