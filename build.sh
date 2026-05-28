@@ -1,17 +1,16 @@
 #!/bin/bash
 
-# 1. Install 'uv' using the official standalone installer
-echo "Installing Backend Engine..."
-curl -LsSf https://astral.sh/uv/install.sh | sh
+echo "Installing uv locally inside the project..."
+# Ye uv ko .cargo mein nahi, balki isi folder ke andar .uv_bin mein daalega
+curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="$PWD/.uv_bin" sh
 
-# 2. Add it to the system path immediately so the build can use it
-export PATH="$HOME/.cargo/bin:$HOME/.local/bin:$PATH"
+# Build time ke liye path
+export PATH="$PWD/.uv_bin:$PATH"
 
-# 3. Sync Python dependencies
 echo "Syncing Python backend..."
+# Ye .venv folder banayega project ke andar
 uv sync
 
-# 4. Build Next.js
 echo "Building Frontend..."
 cd frontend
 npm install
