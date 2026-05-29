@@ -36,6 +36,37 @@ The dashboard complements—not replaces—the Python CLI and Coral agent workfl
 | **Notion** | Search internal security/compliance policy pages and map them to findings |
 | **Slack** | Post ranked alerts with Block Kit formatting |
 
+## Quick start (Local Development Dashboard)
+
+This project requires two terminals to run the Next.js UI and the Coral MCP Engine simultaneously.
+
+### 1. Setup Environment
+
+```bash
+cp .env.example .env
+# Edit .env with your GitHub, Notion, and Slack tokens
+```
+
+### 2. Start Coral Engine
+
+Open your first terminal in the root directory:
+
+```bash
+coral mcp studio
+```
+
+### 3. Start the Next.js Frontend
+
+Open a second terminal:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) in your browser to view the live dashboard.
+
 ## Quick start
 
 ### 1. Install dependencies
