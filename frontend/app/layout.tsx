@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { DemoModeBanner } from "@/components/layout/DemoModeBanner";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -28,7 +29,10 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full dark`}
     >
-      <body className="h-full min-h-screen antialiased">{children}</body>
+      <body className="h-full min-h-screen antialiased">
+        <DemoModeBanner />
+        {children}
+      </body>
     </html>
   );
 }
